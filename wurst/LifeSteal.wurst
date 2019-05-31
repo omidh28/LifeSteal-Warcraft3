@@ -21,6 +21,8 @@ constant INFECTED_UNITS = new HashMap<unit, LinkedList<unit>>
 constant INFECTION_GHOULS = new HashMap<unit, unit>
 constant INFECTION_GHOSTS = new HashMap<unit, unit>
 
+@configurable public boolean LIFE_STEAL_MULTIPLE_INFECTION_PER_CASTER = true
+
 @configurable public real LIFE_STEAL_GHOUL_LIFESPAN = 10
 @configurable public int  LIFE_STEAL_GHOUL_UNIT_ID = 'ugho'
 
@@ -82,7 +84,7 @@ constant INFECTION_GHOSTS = new HashMap<unit, unit>
         ..setAttacksEnabled(0)
         ..setArtSpecial("")
 
-function isAlreadyInfectedByCaster(unit caster, unit target) returns boolean
+function isAlreadyInfectedByCaster(unit caster, unit target) returns boolean        
     if INFECTED_UNITS.has(target) == false or INFECTED_UNITS.get(target).has(caster) == false
         return false
 
@@ -169,9 +171,10 @@ function isUnitAcceptableAsTarget(unit caster, unit target) returns boolean
     
     if target.isSelectable() == false
         return false
-    
-    if isAlreadyInfectedByCaster(caster, target)
-        return false
+
+    if LIFE_STEAL_MULTIPLE_INFECTION_PER_CASTER == false
+        if isAlreadyInfectedByCaster(caster, target)
+            return false
     
     return true
 
