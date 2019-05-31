@@ -21,17 +21,17 @@ constant INFECTED_UNITS = new HashMap<unit, LinkedList<unit>>
 constant INFECTION_GHOULS = new HashMap<unit, unit>
 constant INFECTION_GHOSTS = new HashMap<unit, unit>
 
-@configurable public real GHOUL_LIFESPAN = 10
-@configurable public int  GHOUL_UNIT_ID = 'ugho'
+@configurable public real LIFE_STEAL_GHOUL_LIFESPAN = 10
+@configurable public int  LIFE_STEAL_GHOUL_UNIT_ID = 'ugho'
 
-@configurable public real GHOST_LIFESPAN = 30
-@configurable public int  GHOST_SPEED = 400
-@configurable public int  GHOST_RETURN_HP = 100
+@configurable public real LIFE_STEAL_GHOST_LIFESPAN = 30
+@configurable public int  LIFE_STEAL_GHOST_SPEED = 400
+@configurable public int  LIFE_STEAL_GHOST_RETURN_HP = 100
 
 @configurable public real LIFE_STEAL_CD = 2
 @configurable public real LIFE_STEAL_RADIUS = 500
-@configurable public real LIFE_STEAL_INITIAL_DAMAGE = 100
-@configurable public real LIFE_STEAL_DPS_VALUE = 100
+@configurable public real LIFE_STEAL_INITIAL_DAMAGE = 200
+@configurable public real LIFE_STEAL_DPS_VALUE = 150
 @configurable public real LIFE_STEAL_DPS_DURATION = 5
 @configurable public int  LIFE_STEAL_MANA_COST = 50
 @configurable public int  LIFE_STEAL_GHOSTS = 5
@@ -73,7 +73,7 @@ constant INFECTION_GHOSTS = new HashMap<unit, unit>
     new UnitDefinition(GHOST_UNIT_ID, UnitIds.peasant)
         ..setModelFile("HeroDreadLord_Ghost.mdx")
         ..setDeathType(0)
-        ..setSpeedBase(GHOST_SPEED)
+        ..setSpeedBase(LIFE_STEAL_GHOST_SPEED)
         ..setNormalAbilities(commaList(AbilityIds.invulnerable, AbilityIds.locust, FINGER_OF_DEATH_ID))
         ..setCanFlee(false)
         ..setFoodCost(0)
@@ -126,13 +126,13 @@ function getInfectorByGhost(unit ghost) returns unit
     return INFECTION_GHOSTS.get(ghost)
     
 function createGhoul(player owner, vec2 position) returns unit
-    unit ghoul = CreateUnit(owner, GHOUL_UNIT_ID, position.x, position.y, bj_UNIT_FACING)
-    ghoul.setTimedLife(GHOUL_LIFESPAN)
+    unit ghoul = CreateUnit(owner, LIFE_STEAL_GHOUL_UNIT_ID, position.x, position.y, bj_UNIT_FACING)
+    ghoul.setTimedLife(LIFE_STEAL_GHOUL_LIFESPAN)
     return ghoul
 
 function createGhost(player owner, vec2 position) returns unit
     unit ghost = CreateUnit(owner, GHOST_UNIT_ID, position.x, position.y, bj_UNIT_FACING)
-    ghost.setTimedLife(GHOST_LIFESPAN)
+    ghost.setTimedLife(LIFE_STEAL_GHOST_LIFESPAN)
     return ghost
     
 
@@ -192,7 +192,7 @@ init
             InstantDummyCaster.castTarget(ghost.getOwner(), SHADOW_STRIKE_ID, 1, OrderIds.shadowstrike, target)
         else
             AddSpecialEffectTarget("Abilities\\Spells\\Undead\\AnimateDead\\AnimateDeadTarget.mdl", target, "origin")
-            target.setHP(target.getHP() + GHOST_RETURN_HP)
+            target.setHP(target.getHP() + LIFE_STEAL_GHOST_RETURN_HP)
 
         ghost.kill()
         
