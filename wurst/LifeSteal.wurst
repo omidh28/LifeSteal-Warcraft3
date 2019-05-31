@@ -1,0 +1,215 @@
+package LifeSteal
+
+import ChannelAbilityPreset
+import HashMap
+import LinkedList
+import InstantDummyCaster
+import ClosureEvents
+import UnitIds
+import OrderIds
+import AbilityIds
+import ClosureForGroups
+
+public constant LIFE_STEAL_ID = compiletime(ABIL_ID_GEN.next())
+
+constant GHOST_UNIT_ID = compiletime(UNIT_ID_GEN.next())
+
+constant SHADOW_STRIKE_ID = compiletime(ABIL_ID_GEN.next())
+constant FINGER_OF_DEATH_ID = compiletime(ABIL_ID_GEN.next())
+
+constant INFECTED_UNITS = new HashMap<unit, LinkedList<unit>>
+constant INFECTION_GHOULS = new HashMap<unit, unit>
+constant INFECTION_GHOSTS = new HashMap<unit, unit>
+
+@configurable public real GHOUL_LIFESPAN = 10
+@configurable public int  GHOUL_UNIT_ID = 'ugho'
+
+@configurable public real GHOST_LIFESPAN = 30
+@configurable public int  GHOST_SPEED = 400
+@configurable public int  GHOST_RETURN_HP = 100
+
+@configurable public real LIFE_STEAL_CD = 2
+@configurable public real LIFE_STEAL_RADIUS = 500
+@configurable public real LIFE_STEAL_INITIAL_DAMAGE = 100
+@configurable public real LIFE_STEAL_DPS_VALUE = 100
+@configurable public real LIFE_STEAL_DPS_DURATION = 5
+@configurable public int  LIFE_STEAL_MANA_COST = 50
+@configurable public int  LIFE_STEAL_GHOSTS = 5
+
+@compiletime function genLifeSteal()
+    new AbilityDefinitionMountainKingThunderClap(LIFE_STEAL_ID)
+        ..setArtCaster("")
+        ..setArtEffect("")
+        ..presetIcon("BTNMaskOfDeath")
+        ..setHotkeyNormal("F")
+        ..setLevels(1)
+        ..setCooldown(1, LIFE_STEAL_CD)
+        ..setBuffs(1, "")
+        ..setMovementSpeedReduction(1, 0)
+        ..setAttackSpeedReduction(1, 0)
+        ..setAOEDamage(1, 0)
+        ..setManaCost(1, LIFE_STEAL_MANA_COST)
+        ..setDurationHero(1, 0)
+        ..setDurationNormal(1, 0)
+        ..setName("Life Steal")
+        ..presetTooltipNormal(lvl -> "Li|cffffcc00f|re Steal - Level " + lvl.toString())
+        ..presetTooltipNormalExtended(lvl -> "Create five spirit that go into nearby enemy units. Damage enemies and reduce their movement speed. If enemy unit dies, a Ghoul will be created for last 30 seconds. After Gould died the spirit will return to heal the caster. Also increase miss chance for nearby enemies.")
+
+@compiletime function genShadowStrike()
+    new AbilityDefinitionWardenShadowStrike(SHADOW_STRIKE_ID)
+        ..setDummyAbility()
+        ..setDurationNormal(1, LIFE_STEAL_DPS_DURATION)
+        ..setDecayingDamage(1, LIFE_STEAL_DPS_VALUE)
+        ..setInitialDamage(1, LIFE_STEAL_INITIAL_DAMAGE)
+
+@compiletime function genFingerOfDeath()
+    new AbilityDefinitionFingerofDeath(FINGER_OF_DEATH_ID)
+        ..setDummyAbility()
+        ..setDamage(1, 0)
+        ..setTargetsAllowed(1, "ground, air, friend, enemy")
+        ..setCastRange(1, 100)
+
+@compiletime function genGhost()
+    new UnitDefinition(GHOST_UNIT_ID, UnitIds.peasant)
+        ..setModelFile("HeroDreadLord_Ghost.mdx")
+        ..setDeathType(0)
+        ..setSpeedBase(GHOST_SPEED)
+        ..setNormalAbilities(commaList(AbilityIds.invulnerable, AbilityIds.locust, FINGER_OF_DEATH_ID))
+        ..setCanFlee(false)
+        ..setFoodCost(0)
+        ..setHideMinimapDisplay(true)
+        ..setUpgradesUsed("")
+        ..setAttacksEnabled(0)
+        ..setArtSpecial("")
+
+function isAlreadyInfectedByCaster(unit caster, unit target) returns boolean
+    if INFECTED_UNITS.has(target) == false or INFECTED_UNITS.get(target).has(caster) == false
+        return false
+
+    return true
+
+function isInfectedByAny(unit unitToCheck) returns boolean
+    return INFECTED_UNITS.has(unitToCheck)
+
+function isInfectionGhoul(unit unitToCheck) returns boolean
+    return INFECTION_GHOULS.has(unitToCheck)
+
+function addToInfectedUnits(unit caster, unit target)
+    if isInfectedByAny(target) == false
+        INFECTED_UNITS.put(target, new LinkedList<unit>)
+    
+    LinkedList<unit> casters = getInfectorsByInfected(target)
+    casters.add(caster)
+
+function removeFromInfectedUnits(unit infectedUnit)
+    INFECTED_UNITS.remove(infectedUnit)
+
+function addToInfectionGhouls(unit caster, unit ghoul)
+    INFECTION_GHOULS.put(ghoul, caster)
+
+function addToInfectionGhosts(unit caster, unit ghost)
+    INFECTION_GHOSTS.put(ghost, caster)
+    
+function removeFromInfectionGhouls(unit ghoul)
+    INFECTION_GHOULS.remove(ghoul)
+
+function removeFromInfectionGhosts(unit ghost)
+    INFECTION_GHOSTS.remove(ghost) 
+
+function getInfectorsByInfected(unit infected) returns LinkedList<unit>
+    return INFECTED_UNITS.get(infected)
+    
+function getInfectorByGhoul(unit ghoul) returns unit
+    return INFECTION_GHOULS.get(ghoul)
+
+function getInfectorByGhost(unit ghost) returns unit
+    return INFECTION_GHOSTS.get(ghost)
+    
+function createGhoul(player owner, vec2 position) returns unit
+    unit ghoul = CreateUnit(owner, GHOUL_UNIT_ID, position.x, position.y, bj_UNIT_FACING)
+    ghoul.setTimedLife(GHOUL_LIFESPAN)
+    return ghoul
+
+function createGhost(player owner, vec2 position) returns unit
+    unit ghost = CreateUnit(owner, GHOST_UNIT_ID, position.x, position.y, bj_UNIT_FACING)
+    ghost.setTimedLife(GHOST_LIFESPAN)
+    return ghost
+    
+
+function handleInfectedUnitDeath(unit deadUnit)
+    vec2 deadUnitPosition = deadUnit.getPos()
+    LinkedList<unit> infectors = getInfectorsByInfected(deadUnit)
+    infectors.forEach() (unit infector) ->
+        unit ghoul = createGhoul(infector.getOwner(), deadUnitPosition)
+        addToInfectionGhouls(infector, ghoul)
+
+        removeFromInfectedUnits(deadUnit)
+
+function handleInfectionGhoulDeath(unit deadGhoul)
+    unit caster = getInfectorByGhoul(deadGhoul)
+    removeFromInfectionGhouls(deadGhoul)
+    if caster.isAlive() == false
+        return
+
+    unit returnGhost = createGhost(caster.getOwner(), deadGhoul.getPos())
+    returnGhost.issueTargetOrder("fingerofdeath", caster)
+
+function isUnitAcceptableAsTarget(unit caster, unit target) returns boolean
+    if caster.isEnemyOf(target.getOwner()) == false
+        return false
+    
+    if target.isInvulnerable()
+        return false
+    
+    if target.isHidden()
+        return false
+
+    if target.isIllusion()
+        return false
+    
+    if target.isSelectable() == false
+        return false
+    
+    if isAlreadyInfectedByCaster(caster, target)
+        return false
+    
+    return true
+
+init
+    EventListener.add(EVENT_PLAYER_UNIT_DEATH) () ->
+        unit deadUnit = GetTriggerUnit()
+
+        if isInfectedByAny(deadUnit)
+            handleInfectedUnitDeath(deadUnit)
+
+        if isInfectionGhoul(deadUnit)
+            handleInfectionGhoulDeath(deadUnit)
+    
+    EventListener.onTargetCast(FINGER_OF_DEATH_ID) (unit ghost, unit target) ->
+        if ghost.isEnemyOf(target.getOwner())
+            addToInfectedUnits(getInfectorByGhost(ghost), target)
+            removeFromInfectionGhosts(ghost)
+            InstantDummyCaster.castTarget(ghost.getOwner(), SHADOW_STRIKE_ID, 1, OrderIds.shadowstrike, target)
+        else
+            AddSpecialEffectTarget("Abilities\\Spells\\Undead\\AnimateDead\\AnimateDeadTarget.mdl", target, "origin")
+            target.setHP(target.getHP() + GHOST_RETURN_HP)
+
+        ghost.kill()
+        
+    EventListener.onCast(LIFE_STEAL_ID) (unit caster) ->
+        LinkedList<unit> allUnitsAround = new LinkedList<unit>
+        forUnitsInRange(caster.getPos(), LIFE_STEAL_RADIUS) (unit u) ->
+            allUnitsAround.add(u)
+        
+        LinkedList<unit> acceptableUnits = allUnitsAround.filter() (unit target) -> 
+            return isUnitAcceptableAsTarget(caster, target)
+        
+        acceptableUnits.shuffle()
+        int ghotsCount = LIFE_STEAL_GHOSTS < acceptableUnits.size() ? LIFE_STEAL_GHOSTS : acceptableUnits.size()
+        if ghotsCount > 0
+            for i = 0 to (ghotsCount - 1)
+                unit target = acceptableUnits.pop()
+                unit ghost = createGhost(caster.getOwner(), caster.getPos())
+                addToInfectionGhosts(caster, ghost)
+                ghost.issueTargetOrder("fingerofdeath", target)
+            
